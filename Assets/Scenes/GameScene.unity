@@ -357,8 +357,8 @@ MonoBehaviour:
   headTrans: {fileID: 495411396}
   leftProp: {fileID: 1716322051}
   rightProp: {fileID: 1627024704}
-  flyMaxForce: 500
-  flyForceRate: 80
+  flyMaxForce: 350
+  flyForceRate: 200
   maxAngularVelocity: 100
   windForce: 50
 --- !u!1 &519420028
@@ -502,8 +502,8 @@ MonoBehaviour:
   counts: 06000000140000001000000002000000
   roundTime: 40
   learnRate: 0.5
-  mutationRate: 0.2
-  mutationStrength: 0.35
+  mutationRate: 0.3
+  mutationStrength: 0.45
   avgGrades: []
   weights: []
 --- !u!1 &937718294
@@ -702,7 +702,7 @@ Transform:
   m_PrefabInternal: {fileID: 0}
   m_GameObject: {fileID: 1506837874}
   m_LocalRotation: {x: -0, y: -0, z: 0.7071068, w: 0.7071068}
-  m_LocalPosition: {x: 28.09, y: -7.6, z: 0}
+  m_LocalPosition: {x: 27.3, y: -7.6, z: 0}
   m_LocalScale: {x: 1, y: 12.163, z: 1}
   m_Children: []
   m_Father: {fileID: 384427672}

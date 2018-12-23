@@ -21,7 +21,6 @@ public class NeuralNetwork
         {
             this.weights.Add(DenseMatrix.OfMatrix(weights[i]));
         }
-        // 初始化时, 权重随机
         for (int i = 0; i < weights.Count; i++)
         {
             weights[i] = DenseMatrix.CreateRandom(weights[i].RowCount, weights[i].ColumnCount, new MathNet.Numerics.Distributions.Normal(0, 0.5));

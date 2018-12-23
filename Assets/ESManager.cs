@@ -42,10 +42,19 @@ public class ESManager : MonoBehaviour
         var json = r.ReadToEnd();
         r.Close();
         var data = JsonUtility.FromJson<ESManagerData>(json);
+
         data.LoadTo(this);
+        foreach (var m in men)
+        {
+            var ws = m.nn.weights;
+            for (int i = 0; i < ws.Count; i++)
+                ws[i] = (DenseMatrix)weights[i].Clone();
+        }
+
         StopAllCoroutines();
         generation -= 1;
-        NextGeneration(true);
+        AddNoiseToWeights();
+        NextGeneration();
     }
         
     private void Start()
@@ -86,7 +95,8 @@ public class ESManager : MonoBehaviour
         for (int i = 0; i < counts.Length - 1; i++)
         {
             // 正态分布随机初始化
-            DenseMatrix h = new DenseMatrix(counts[i] + 1, counts[i + 1]);
+            //DenseMatrix h = new DenseMatrix(counts[i] + 1, counts[i + 1]);
+            DenseMatrix h = DenseMatrix.CreateRandom(counts[i] + 1, counts[i + 1],new MathNet.Numerics.Distributions.Normal(0, 0.5));
             weights.Add(h);
         }
         // 初始化各个network...
@@ -96,7 +106,7 @@ public class ESManager : MonoBehaviour
         }
 
         // ======================== 第一代 ======================== 
-        NextGeneration(true);
+        NextGeneration();
     }
 
     private void FixedUpdate()
@@ -130,51 +140,35 @@ public class ESManager : MonoBehaviour
         {
             for (int j = 0; j < men.Count; j++)
             {
-                men[j].Reset(poses[i] * new Vector2(1, 1), false);
+                men[j].Reset(poses[i], false);
             }
 
             startTime = Time.time;
             while (Time.time - startTime < stepSecs && !isAllDead())
                 yield return null;
         }
-
-        NextGeneration(false);
+        CountGenerationGrade();
+        UpdateGenerationWeights();
+        AddNoiseToWeights();
+        NextGeneration();
     }
 
-    void NextGeneration(bool isInit)
+    void NextGeneration()
     {
-        if (!isInit)
-        {
-            CountGenerationGrade();
-            UpdateGenerationWeights();
-            // 选择一组权值并用正态分布随机
-            for (int i = 0; i < weights.Count; i++)
-            {
-                // 随机取一部分节点作变化
-                int row = weights[i].RowCount;
-                int column = weights[i].ColumnCount;
-                var maskMat = new DenseMatrix(row, column);
-                maskMat = (DenseMatrix)maskMat.Map(x => (Random.value < mutationRate ? 1d : 0d));
-
-                // 这里有问题啊喂!
-                foreach (var m in men)
-                {
-                    var ws = m.nn.weights;
-                    ws[i] = weights[i] + (DenseMatrix)maskMat.PointwiseMultiply(DenseMatrix.CreateRandom(row, column, new MathNet.Numerics.Distributions.Normal(0, mutationStrength)));
-                    //ws[i] += (DenseMatrix)maskMat.PointwiseMultiply(DenseMatrix.CreateRandom(row, column, new MathNet.Numerics.Distributions.Normal(0, mutationStrength)));
-                }
-            }
-        }
-        Debug.Log(weights[0]);
         // 下一代
         generation++;
+        if (mutationStrength > 0.1)
+        {
+            mutationStrength *= 0.996;
+            if (mutationStrength < 0.1)
+                mutationStrength = 0.1;
+        }
         
         for (int i = 0; i < men.Count; i++)
         {
             men[i].Reset(Vector2.zero, true);
-            //men[i].transform.position = new Vector2(Random.Range(-2f, 2f), Random.Range(-2f, 2f));
         }
-
+        
         StopAllCoroutines();
         StartCoroutine(SimulateForSeconds(roundTime));
     }
@@ -220,6 +214,27 @@ public class ESManager : MonoBehaviour
             weights[i] += (w - weights[i]) * learnRate;
         }
     }
+    // 为权值添加噪声
+    void AddNoiseToWeights()
+    {
+        // 选择一组权值并用正态分布随机
+        for (int i = 0; i < weights.Count; i++)
+        {
+            // 随机取一部分节点作变化
+            int row = weights[i].RowCount;
+            int column = weights[i].ColumnCount;
+            var maskMat = new DenseMatrix(row, column);
+            maskMat = (DenseMatrix)maskMat.Map(x => (Random.value < mutationRate ? 1d : 0d));
+
+            // 这里有问题啊喂!
+            foreach (var m in men)
+            {
+                var ws = m.nn.weights;
+                ws[i] = weights[i] + (DenseMatrix)maskMat.PointwiseMultiply(DenseMatrix.CreateRandom(row, column, new MathNet.Numerics.Distributions.Normal(0, mutationStrength)));
+                //ws[i] += (DenseMatrix)maskMat.PointwiseMultiply(DenseMatrix.CreateRandom(row, column, new MathNet.Numerics.Distributions.Normal(0, mutationStrength)));
+            }
+        }
+    }
 
     private void OnGUI()
     {
@@ -234,21 +249,16 @@ public class ESManager : MonoBehaviour
         mutationStrength = GUILayout.HorizontalSlider((float)mutationStrength, 0f, 1f);
         
         GUILayout.Label("模拟速度" + Time.timeScale);
-        Time.timeScale =  GUILayout.HorizontalSlider((float)Time.timeScale, 1f, 4f);
+        Time.timeScale =  GUILayout.HorizontalSlider((float)Time.timeScale, 1f, 8f);
         
         GUILayout.Space(20);
         GUILayout.Label("储存路径");
         savePath = GUILayout.TextField(savePath);
 
-        try
-        {
-            if (GUILayout.Button("保存数据"))
-                SaveData(savePath);
-            if (GUILayout.Button("读取数据"))
-                LoadData(savePath);
-        }
-        catch
-        {}
+        if (GUILayout.Button("保存数据"))
+            SaveData(savePath);
+        if (GUILayout.Button("读取数据"))
+            LoadData(savePath);
 
         GUILayout.Label("重新开始训练");
         if(GUILayout.Button("RESTART"))
@@ -288,7 +298,7 @@ public class WeightsData
         this.counts = counts;
         foreach (var w in ws)
         {
-            double[] rowW = w.ToRowWiseArray();
+            double[] rowW = w.ToColumnWiseArray();
             data.AddRange(rowW);
         }
     }
